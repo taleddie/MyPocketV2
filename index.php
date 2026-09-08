@@ -37,6 +37,10 @@ $hoje = date('Y-m-d');
             box-shadow: 0 0 0 3px #b02a37 !important;
         }
 
+        .activeBlue {
+            box-shadow: 0 0 0 3px #053c8f !important;
+        }
+
         .bg {
 
             background-color: #2c2c2c;
@@ -133,11 +137,26 @@ $hoje = date('Y-m-d');
                     <form action="processa.php" method="POST">
                         <h2 class="m-3 text-center fw-bold">Nova transação</h2>
 
-                        <!-- botoes receita ou despesa -->
+                        <!-- botoes receita, despesa ou diario -->
                         <div class="d-flex justify-content-center gap-3 ">
                             <input type="hidden" id="tipo" name="tipo">
+                            <input type="hidden" id="tipo_diario" name="tipo_diario">
+
                             <button type="button" id="btnReceita" class="btn btn-success rounded-5">Receita</button>
                             <button type="button" id="btnDespesa" class="btn btn-danger rounded-5">Despesa</button>
+                            <button type="button" id="btnDiario" class="btn btn-primary rounded-5">Diário</button>
+                        </div>
+
+                        <!-- area de definir periodo do diario (some quando nao esta selecionado) -->
+                        <div class="mb-3 mt-3 mx-5 d-none" id="campo-periodo">
+                            <label for="periodo" class="form-label">Período</label>
+                            <select name="periodo" id="periodo" class="rounded-5 form-select shadow">
+                                <option value="">Selecione o período...</option>
+                                <option value="diario">Diário</option>
+                                <option value="quinzenal">A cada 15 dias</option>
+                                <option value="mensal">Mensal</option>
+                                <option value="anual">Anual</option>
+                            </select>
                         </div>
 
                         <!-- valor -->
@@ -223,12 +242,19 @@ $hoje = date('Y-m-d');
         <script>
             const btnReceita = document.getElementById("btnReceita");
             const btnDespesa = document.getElementById("btnDespesa");
+            const btnDiario = document.getElementById("btnDiario");
             const tipo = document.getElementById("tipo");
+            const tipoDiario = document.getElementById("tipo_diario");
+            const campoperiodo = document.getElementById("campo-periodo");
+            const selectperiodo = document.getElementById("periodo");
+
+            let operacaoSelecionada = "";
+            let diarioAtivo = false;
 
             document.querySelector("form").addEventListener("submit", (e) => {
                 if (!tipo.value) {
                     e.preventDefault();
-                    alert("Selecione Receita ou Despesa.");
+                    alert("Selecione Receita, Despesa ou Diário.");
                 }
             });
 
@@ -237,6 +263,8 @@ $hoje = date('Y-m-d');
 
                 btnReceita.classList.add("activeGreen");
                 btnDespesa.classList.remove("activeRed");
+
+                atualizarTipoEVisual();
             });
 
             btnDespesa.addEventListener("click", () => {
@@ -244,7 +272,33 @@ $hoje = date('Y-m-d');
 
                 btnDespesa.classList.add("activeRed");
                 btnReceita.classList.remove("activeGreen");
+
+                atualizarTipoEVisual();
             });
+
+            btnDiario.addEventListener("click", () => {
+                diarioAtivo = !diarioAtivo;
+                if (diarioAtivo) {
+                    btnDiario.classList.add("activeBlue");
+                    campoperiodo.classList.remove("d-none");
+                    selectperiodo.required = true;
+                } else {
+                    btnDiario.classList.remove("activeBlue");
+                    campoperiodo.classList.add("d-none");
+                    selectperiodo.required = false;
+                }
+                atualizarTipoEVisual();
+            });
+
+            function atualizarTipoEVisual() {
+                if (diarioAtivo) {
+                    inputTipo.value = "diario";
+                    inputTipoDiario.value = operacaoSelecionada; 
+                } else {
+                    inputTipo.value = operacaoSelecionada;
+                    inputTipoDiario.value = "";
+                }
+            }
 
         </script>
 

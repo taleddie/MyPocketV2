@@ -3,34 +3,38 @@
 declare(strict_types=1);
 
 abstract class Transacao {
-    protected $id;
-    protected $data;
-    protected $valor;
-    protected $descricao;
+    protected int $id;
+    protected string $tipo;
+    protected string $data;
+    protected float $valor;
+    protected string $descricao;
 
-    public function __construct($data, $valor, $descricao, $id = null) {
+    public function __construct(int $data, string $tipo, float $valor, string $descricao, int $id = null) {
         $this->id = $id;
+        $this->tipo = $tipo;
         $this->data = $data;
         $this->valor = $valor;
         $this->descricao = $descricao;
     }
 
-    public function getId () {
+    public function getId (): int {
         return $this->id;
     }
 
-    public function getData () {
+    public function getTipo (): string {
+        return $this->tipo;
+    }
+
+    public function getData (): string {
         return $this->data;
     }
 
-    public function getValor () {
+    public function getValor (): float {
         return $this->valor;
     }
 
-    public function getDescricao () {
+    public function getDescricao (): string {
         return $this->descricao;
     }
-
-    abstract public function getTipo();
 
 }
