@@ -2,6 +2,9 @@
 
 require_once __DIR__ . '/conexao.php';
 require_once __DIR__ . '/TransacaoRepo.php';
+require_once __DIR__ . '/../classes/Transacao.php';
+require_once __DIR__ . '/../classes/Receita.php';
+require_once __DIR__ . '/../classes/Despesa.php';
 
 session_start();
 
@@ -24,9 +27,10 @@ if (!$transacaoAtual) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // pegar os novos dados vindos do formulário
     $novoTipo = $_POST['tipo'] ?? '';
     $novoValor = (float) ($_POST['valor'] ?? 0);
+    $data = $_POST['data'] ?? '';
+    $descricao = trim($_POST['descricao'] ?? '');
 
     if ($novoTipo !== 'receita' && $novoTipo !== 'despesa') {
         $_SESSION['erro'] = "Selecione obrigatoriamente se é Receita ou Despesa.";
@@ -34,38 +38,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // REGRAS DE SEGURANÇA E VALIDAÇÃO DE SALDO
     $saldoAtual = $repo->calcularSaldo();
     $saldoAjustado = $saldoAtual;
 
-    // U - UPDATE: estornar o valor antigo para calcular o saldo disponível
+    // Estorna temporariamente o valor antigo para simular o novo saldo disponível
     if ($transacaoAtual->getTipo() === 'despesa') {
         $saldoAjustado += $transacaoAtual->getValor();
     } elseif ($transacaoAtual->getTipo() === 'receita') {
         $saldoAjustado -= $transacaoAtual->getValor();
     }
 
-    // saldo insuficiente
+    // Trava de segurança: impede saldo negativo
     if ($novoTipo === 'despesa' && $novoValor > $saldoAjustado) {
-        $_SESSION['erro'] = "Saldo insuficiente para esta alteração.";
+        $_SESSION['erro'] = "Saldo insuficiente para realizar esta alteração.";
         header("Location: editar.php?id={$id}");
         exit;
     }
 
-    // saldo insuficiente para despesa na primeira transação
+    // Trava de segurança: a primeira transação do sistema não pode ser alterada para despesa
     if ($novoTipo === 'despesa' && $id === $repo->buscarPrimeiraId()) {
-        $_SESSION['erro'] = "Saldo insuficiente para esta alteração.";
+        $_SESSION['erro'] = "A primeira transação cadastrada precisa ser uma receita para manter a integridade do saldo.";
         header("Location: editar.php?id={$id}");
         exit;
     }
 
-    // U - UPDATE: salvar alterações
-    $tipo = $novoTipo;
-    $valor = $novoValor;
-    $data = $_POST['data'] ?? '';
-    $descricao = trim($_POST['descricao'] ?? '');
+    if (!empty($descricao) && $novoValor > 0 && !empty($novoTipo)) {
+        // Instancia a classe correta conforme a nova escolha
+        $transacaoAtualizada = ($novoTipo === 'despesa') 
+            ? new Despesa($id, $novoValor, $data, $descricao) 
+            : new Receita($id, $novoValor, $data, $descricao);
 
-    if (!empty($descricao) && $valor > 0 && !empty($tipo)) {
-        $repo->atualizar($id, $tipo, $valor, $data, $descricao);
+        // Executa o UPDATE no banco
+        $repo->atualizar($transacaoAtualizada);
+
         $_SESSION['sucesso'] = "Transação atualizada com sucesso.";
         header('Location: ../index.php');
         exit;
@@ -80,28 +86,17 @@ $hoje = date('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Editar transação</title>
     <style>
-        body {
-            background-color: #2c2c2c;
-        }
-
-        .activeGreen {
-            box-shadow: 0 0 0 3px #146c43 !important;
-        }
-
-        .activeRed {
-            box-shadow: 0 0 0 3px #b02a37 !important;
-        }
-
+        body { background-color: #2c2c2c; }
+        .activeGreen { box-shadow: 0 0 0 3px #146c43 !important; }
+        .activeRed { box-shadow: 0 0 0 3px #b02a37 !important; }
         #card-form {
             background: #ffffff9a;
             border-radius: 25px;
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.71);
             backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
             border: 1px solid rgba(255, 255, 255, 0.84);
         }
     </style>
