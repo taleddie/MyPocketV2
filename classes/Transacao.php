@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 abstract class Transacao {
-    protected int $id;
+    protected ?int $id;
     protected string $tipo;
     protected string $data;
     protected float $valor;
     protected string $descricao;
 
-    public function __construct(int $data, string $tipo, float $valor, string $descricao, int $id = null) {
+    public function __construct(?int $id, string $tipo, float $valor, string $data, string $descricao) {
         $this->id = $id;
         $this->tipo = $tipo;
         $this->data = $data;
@@ -17,7 +17,7 @@ abstract class Transacao {
         $this->descricao = $descricao;
     }
 
-    public function getId (): int {
+    public function getId (): ?int {
         return $this->id;
     }
 

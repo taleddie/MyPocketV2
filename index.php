@@ -7,8 +7,10 @@ session_start();
 
 $repo = new TransacaoRepo($pdo);
 
+$repo->processarDiarios();
 $saldo = $repo->calcularSaldo();
 $transacoes = $repo->listarTodas();
+$pendencia = $repo->processarDiarios();
 
 // captura e limpa mensagens de feedback
 $erro = $_SESSION['erro'] ?? null;
@@ -55,7 +57,8 @@ $hoje = date('Y-m-d');
 
         #card-saldo,
         #card-form,
-        #card-extrato {
+        #card-extrato,
+        #card-pendencia {
             background: #ffffff9a;
             border-radius: 25px;
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.71);
@@ -86,11 +89,10 @@ $hoje = date('Y-m-d');
             text-decoration: none;
             font-size: 0.85rem;
             color: #000000;
-            top: -2;
         }
 
         .acoes-transacao img {
-            margin-top: -2;
+            margin-top: -2px;
             width: 15px;
         }
 
@@ -132,28 +134,50 @@ $hoje = date('Y-m-d');
                     </div>
                 <?php endif; ?>
 
+                <!-- alerta especifico para pendencias -->
+                <?php if ($pendencia): ?>
+                    <div class="p-3 mb-3 text-dark border border-danger border-2" id="card-pendencia" style="background-color: #ffdddd;">
+                        <h4 class="text-danger fw-bold text-center">Cobrança Pendente!</h4>
+                        <p class="text-center mb-2">
+                            A despesa <strong><?= htmlspecialchars($pendencia['descricao']) ?></strong> de 
+                            <strong>R$ <?= number_format($pendencia['valor'], 2, ',', '.') ?></strong> tentou ser cobrada em 
+                            <?= date('d/m/Y', strtotime($pendencia['data_cobrança'])) ?>, mas seu saldo atual é de 
+                            <strong>R$ <?= number_format($pendencia['saldo_atual'], 2, ',', '.') ?></strong>.
+                        </p>
+                        <p class="text-center text-muted small">
+                            Cadastre uma <strong>Receita</strong> para cobrir o valor ou escolha uma das opções abaixo:
+                        </p>
+                        <form action="processa.php" method="POST" id="formPendencia" class="d-flex justify-content-center gap-2">
+                            <input type="hidden" name="id_pendencia" value="<?= $pendencia['id'] ?>">
+                            <button type="submit" name="acao_pendencia" value="cancelar" class="btn btn-sm btn-outline-secondary rounded-4">Cancelar este diário</button>
+                            <button type="submit" name="acao_pendencia" value="acumular" class="btn btn-sm btn-outline-secondary rounded-4">Pagar na próx. cobrança</button>
+                        </form>
+                    </div>
+                <?php endif; ?>
+
                 <!--form-->
                 <div class="p-3 mb-2 text-dark" id="card-form">
                     <form action="processa.php" method="POST">
                         <h2 class="m-3 text-center fw-bold">Nova transação</h2>
 
-                        <!-- botoes receita, despesa ou diario -->
+                        <!-- botoes receita, despesa ou diario + bloqueio de despesa-->
                         <div class="d-flex justify-content-center gap-3 ">
                             <input type="hidden" id="tipo" name="tipo">
                             <input type="hidden" id="tipo_diario" name="tipo_diario">
 
                             <button type="button" id="btnReceita" class="btn btn-success rounded-5">Receita</button>
-                            <button type="button" id="btnDespesa" class="btn btn-danger rounded-5">Despesa</button>
+                            <button type="button" id="btnDespesa" class="btn btn-danger rounded-5" <?= $pendencia ? 'disabled title="Bloqueado por pendência de saldo"' : '' ?>>Despesa</button>
+
                             <button type="button" id="btnDiario" class="btn btn-primary rounded-5">Diário</button>
                         </div>
 
-                        <!-- area de definir periodo do diario (some quando nao esta selecionado) -->
-                        <div class="mb-3 mt-3 mx-5 d-none" id="campo-periodo">
-                            <label for="periodo" class="form-label">Período</label>
-                            <select name="periodo" id="periodo" class="rounded-5 form-select shadow">
+                        <!-- area de definir frequencia do diario (some quando nao esta selecionado) -->
+                        <div class="mb-3 mt-3 mx-5 d-none" id="campo-frequencia">
+                            <label for="frequencia" class="form-label">Período</label>
+                            <select name="frequencia" id="frequencia" class="rounded-5 form-select shadow">
                                 <option value="">Selecione o período...</option>
                                 <option value="diario">Diário</option>
-                                <option value="quinzenal">A cada 15 dias</option>
+                                <option value="semanal">Semanal</option>
                                 <option value="mensal">Mensal</option>
                                 <option value="anual">Anual</option>
                             </select>
@@ -210,9 +234,8 @@ $hoje = date('Y-m-d');
                             </div>
 
                             <div class="acoes-transacao mt-1">
-                                <a href="database/editar.php?id=<?= $info->getId() ?>"><img src="/img/editar.png/" alt=""> Editar</a> |
-                                <a href="database/delete.php?id=<?= $info->getId() ?>"
-                                   onclick="return confirm('Excluir esta transação?')"><img src="/img/excluir.png/" alt=""> Excluir</a>
+                                <a href="database/editar.php?id=<?= $info->getId() ?>"><img src="img/editar.png" alt="Editar"> Editar</a> |
+                                <a href="database/delete.php?id=<?= $info->getId() ?>" onclick="return confirm('Excluir esta transação?')"><img src="img/excluir.png" alt="Excluir"> Excluir</a>
                             </div>
                         </div>
 
@@ -236,64 +259,62 @@ $hoje = date('Y-m-d');
         </div>
 
     </div>
-    
-    
 
         <script>
             const btnReceita = document.getElementById("btnReceita");
             const btnDespesa = document.getElementById("btnDespesa");
             const btnDiario = document.getElementById("btnDiario");
-            const tipo = document.getElementById("tipo");
-            const tipoDiario = document.getElementById("tipo_diario");
-            const campoperiodo = document.getElementById("campo-periodo");
-            const selectperiodo = document.getElementById("periodo");
+            const inputTipo = document.getElementById("tipo");
+            const inputTipoDiario = document.getElementById("tipo_diario");
+            const campofrequencia = document.getElementById("campo-frequencia");
+            const selectfrequencia = document.getElementById("frequencia");
 
             let operacaoSelecionada = "";
             let diarioAtivo = false;
 
-            document.querySelector("form").addEventListener("submit", (e) => {
-                if (!tipo.value) {
+            document.querySelector("#card-form form").addEventListener("submit", (e) => {
+                if (!inputTipo.value) {
                     e.preventDefault();
                     alert("Selecione Receita, Despesa ou Diário.");
                 }
             });
 
             btnReceita.addEventListener("click", () => {
-                tipo.value = "receita";
-
+                operacaoSelecionada = "receita";
                 btnReceita.classList.add("activeGreen");
-                btnDespesa.classList.remove("activeRed");
+                if (btnDespesa) btnDespesa.classList.remove("activeRed");
 
                 atualizarTipoEVisual();
             });
 
-            btnDespesa.addEventListener("click", () => {
-                tipo.value = "despesa";
+            if (btnDespesa) {
+                btnDespesa.addEventListener("click", () => {
+                    operacaoSelecionada = "despesa";
+                    btnDespesa.classList.add("activeRed");
+                    btnReceita.classList.remove("activeGreen");
 
-                btnDespesa.classList.add("activeRed");
-                btnReceita.classList.remove("activeGreen");
-
-                atualizarTipoEVisual();
-            });
+                    atualizarTipoEVisual();
+                });
+            }
 
             btnDiario.addEventListener("click", () => {
                 diarioAtivo = !diarioAtivo;
                 if (diarioAtivo) {
                     btnDiario.classList.add("activeBlue");
-                    campoperiodo.classList.remove("d-none");
-                    selectperiodo.required = true;
+                    campofrequencia.classList.remove("d-none");
+                    selectfrequencia.required = true;
                 } else {
                     btnDiario.classList.remove("activeBlue");
-                    campoperiodo.classList.add("d-none");
-                    selectperiodo.required = false;
+                    campofrequencia.classList.add("d-none");
+                    selectfrequencia.required = false;
                 }
                 atualizarTipoEVisual();
             });
 
             function atualizarTipoEVisual() {
                 if (diarioAtivo) {
-                    inputTipo.value = "diario";
-                    inputTipoDiario.value = operacaoSelecionada; 
+                    inputTipo.value = operacaoSelecionada;
+                    inputTipoDiario.value = "diario"; 
                 } else {
                     inputTipo.value = operacaoSelecionada;
                     inputTipoDiario.value = "";

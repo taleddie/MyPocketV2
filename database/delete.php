@@ -1,18 +1,12 @@
 <?php
-
-require_once __DIR__ . '/conexao.php';
-require_once __DIR__ . '/TransacaoRepo.php';
-
-session_start();
-
-$repo = new TransacaoRepo($pdo);
+require_once 'conexao.php';
 
 $id = $_GET['id'] ?? null;
 
 if ($id) {
-    $repo->deletar((int) $id);
-    $_SESSION['sucesso'] = "Transação excluída com sucesso.";
+    $stmt = $pdo->prepare("DELETE FROM transacao WHERE id = ?");
+    $stmt->execute([$id]);
 }
 
-header('Location: ../index.php');
+header("Location: ../index.php");
 exit;

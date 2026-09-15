@@ -10,7 +10,7 @@ class Receita extends Transacao {
         parent::__construct($id, 'receita', $valor, $data, $descricao);
     }
 
-    public function getTipo() {
+    public function getTipo(): string {
         return "Entrada";
     }
 }

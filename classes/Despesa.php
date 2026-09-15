@@ -11,7 +11,7 @@ class Despesa extends Transacao {
     }
 
 
-    public function getTipo() {
+    public function getTipo(): string {
         return "Saída";
     }
 }

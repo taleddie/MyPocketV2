@@ -8,6 +8,7 @@ class Diario extends Transacao {
 
     private string $frequencia;
     private ?string $proximaExecucao;
+    private bool $ativo;
 
     public function __construct(
         ?int $id,
@@ -31,10 +32,23 @@ class Diario extends Transacao {
         return $this->frequencia;
     }
 
-    public function setFrequencia(string $frequencia): void 
-    {
-        $this->frequencia = $frequencia;
+    public function setFrequencia(string $frequencia): void {
+    // Normaliza a string convertendo para minúsculas e removendo espaços
+    $freqFormatada = mb_strtolower(trim($frequencia));
+
+    // Mapeia variações comuns para o formato aceito pelo sistema
+    if (in_array($freqFormatada, ['diario', 'diário', 'diaria', 'diária'])) {
+        $this->frequencia = 'Diário';
+    } elseif (in_array($freqFormatada, ['semanal', 'semana'])) {
+        $this->frequencia = 'Semanal';
+    } elseif (in_array($freqFormatada, ['mensal', 'mes'])) {
+        $this->frequencia = 'Mensal';
+    } elseif (in_array($freqFormatada, ['anual', 'ano'])) {
+        $this->frequencia = 'Anual';
+    } else {
+        throw new InvalidArgumentException("Frequência inválida: {$frequencia}");
     }
+}
 
     // ler e atualizar a proxima execucao
     public function getProximaExecucao(): ?string 
@@ -47,26 +61,39 @@ class Diario extends Transacao {
         $this->proximaExecucao = $proximaExecucao;
     }
 
+    // ler e atualizar status ativo
+    public function isAtivo(): bool 
+    {
+        return $this->ativo;
+    }
+
+    public function setAtivo(bool $ativo): void 
+    {
+        $this->ativo = $ativo;
+    }
+
     public function calcularProximaData(): string 
     {
-        $dataBase = new DateTime($this->proximaExecucao ?? $this->getData());
+        $dataStr = $this->proximaExecucao ?? $this->getData() ?? 'now';
+        $dataBase = new DateTime($dataStr);
+
         switch ($this->frequencia) {
             case 'Diário':
-                $dataAtual->modify('+1 day');
+                $dataBase->modify('+1 day');
                 break;
             case 'Semanal':
-                $dataAtual->modify('+1 week');
+                $dataBase->modify('+1 week');
                 break;
             case 'Mensal':
-                $dataAtual->modify('+1 month');
+                $dataBase->modify('+1 month');
                 break;
             case 'Anual':
-                $dataAtual->modify('+1 year');
+                $dataBase->modify('+1 year');
                 break;
             default:
                 throw new InvalidArgumentException("Frequência inválida: " . $this->frequencia);
         }
-        return $dataAtual->format('Y-m-d');
-    }
 
+        return $dataBase->format('Y-m-d');
+    }
 }
